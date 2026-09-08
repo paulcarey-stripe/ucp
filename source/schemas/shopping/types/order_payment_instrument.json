@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ucp.dev/schemas/shopping/types/order_payment_instrument.json",
+  "title": "Order Payment Instrument",
+  "description": "Order representation of a payment instrument for display and payment reporting, without credentials or Checkout routing state.",
+  "allOf": [
+    { "$ref": "payment_instrument.json" },
+    {
+      "type": "object",
+      "required": ["display"],
+      "properties": {
+        "authorized_amount": {
+          "$ref": "../../common/types/amount.json",
+          "description": "Current effective authorization for this instrument in the Order currency's minor units. Released and expired authorizations are excluded. The value describes current authorization coverage rather than historical volume or remaining capture capacity."
+        },
+        "captured_amount": {
+          "$ref": "../../common/types/amount.json",
+          "description": "Gross cumulative amount successfully captured or collected for this instrument in the Order currency's minor units, measured before refunds, credits, disputes, or capture reversals. The value describes payment execution rather than settlement or payout."
+        }
+      },
+      "not": {
+        "anyOf": [
+          { "required": ["credential"] },
+          { "required": ["handler_id"] },
+          { "required": ["selected"] }
+        ]
+      }
+    }
+  ]
+}

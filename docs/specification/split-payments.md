@@ -47,6 +47,11 @@ charged for each successfully-processed instrument in the same `amount`
 field. Response `amount` is informational only; see "Response: Actual
 Charges" below.
 
+Split Payments `amount` expresses an instrument's contribution to the
+checkout. It does not distinguish authorization from capture and MUST NOT be
+used as a substitute for the Order instrument's `authorized_amount` or
+`captured_amount`.
+
 All `amount` values are expressed in `checkout.currency` minor units
 (ISO 4217). Handlers using foreign-currency-denominated instruments
 (e.g., a CAD gift card in a USD checkout) or non-currency instruments

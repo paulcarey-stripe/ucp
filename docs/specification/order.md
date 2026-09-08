@@ -102,15 +102,31 @@ Each instrument reuses the base checkout
 * Credentials are never returned in responses (see
   [Credential Flow & PCI Scope](overview.md#credential-flow-pci-scope));
   businesses omit `credential` on the order
-* `amount` reports the amount charged to the instrument, in the order
-  currency's minor units (ISO 4217)
+* `authorized_amount` is the authorization currently effective for the
+  instrument, in the Order currency's minor units. Released and expired
+  authorizations are excluded. The field describes current authorization
+  coverage rather than historical volume or remaining capture capacity
+* `captured_amount` is the cumulative amount successfully captured or
+  collected, in the Order currency's minor units. It records the gross amount
+  before refunds, credits, disputes, or capture reversals and describes payment
+  execution rather than settlement or payout
+
+Either amount field may be omitted. Consumers MUST accept a `captured_amount`
+greater than `authorized_amount`; this can result from supported capture above
+authorization or a subsequent authorization release. Neither field establishes
+a per-instrument maximum.
+
+Order payment instruments contain the information needed for display and
+payment reporting. Credentials and reusable tokens remain in the payment
+request, while Checkout routing and selection remain in
+`selected_payment_instrument`.
 
 ### Attribution
 
 Businesses MAY surface a snapshot of the originating checkout's
-`attribution` on the order. Read-only on the order — agents do not write
-`order.attribution`. See [Attribution](overview.md#attribution) for the
-underlying contract.
+`attribution` on the order. The field is read-only and supplied by the
+business. See [Attribution](overview.md#attribution) for the underlying
+contract.
 
 ### Adjustments
 
@@ -132,6 +148,10 @@ fulfillment:
 ### Order
 
 {{ schema_fields('order', 'order') }}
+
+### Order Payment
+
+{{ extension_schema_fields('order.json#/$defs/order_payment', 'order') }}
 
 ### Order Line Item
 
@@ -159,15 +179,15 @@ else if (fulfilled > 0) → "partial"
 else → "processing"
 ```
 
-### Payment Instrument
+### Order Payment Instrument
 
 Each instrument represents a single tender used on the order. It uses the
 shared base Payment Instrument — handler instrument schemas extend the base
 once and apply in both Checkout and Order contexts — with `display` required
-and an order-specific `amount` reporting the charge in the order currency's
-minor units (ISO 4217).
+and optional order-specific `authorized_amount` and `captured_amount` summaries
+in the order currency's minor units.
 
-{{ schema_fields('types/payment_instrument', 'order') }}
+{{ schema_fields('types/order_payment_instrument', 'order') }}
 
 ### Expectation
 
@@ -284,7 +304,7 @@ Examples: `refund`, `return`, `credit`, `price_adjustment`, `dispute`,
       {
         "id": "pi_gift",
         "type": "gift_card",
-        "amount": 5000,
+        "captured_amount": 5000,
         "display": {
           "description": "Gift card",
           "last_digits": "9821"
@@ -293,7 +313,7 @@ Examples: `refund`, `return`, `credit`, `price_adjustment`, `dispute`,
       {
         "id": "pi_card",
         "type": "card",
-        "amount": 10342,
+        "captured_amount": 10342,
         "billing_address": {
           "street_address": "123 Main St",
           "address_locality": "Austin",

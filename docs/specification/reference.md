@@ -23,6 +23,10 @@ within the UCP.
 
 {{ auto_generate_schema_reference('.', 'reference', include_extensions=False) }}
 
+### Order Payment
+
+{{ extension_schema_fields('order.json#/$defs/order_payment', 'reference') }}
+
 ## Type Schemas
 
 {{ auto_generate_schema_reference('types', 'reference', include_extensions=False, base_dir='source/schemas/common') }}

@@ -19,6 +19,20 @@
           "description": "URL where merchant sends order lifecycle events (webhooks)."
         }
       }
+    },
+    "order_payment": {
+      "title": "Order Payment",
+      "description": "Current payment details returned on the Order for display and reconciliation.",
+      "type": "object",
+      "properties": {
+        "instruments": {
+          "type": "array",
+          "items": {
+            "$ref": "types/order_payment_instrument.json"
+          },
+          "description": "Payment instruments used on the Order."
+        }
+      }
     }
   },
   "type": "object",
@@ -81,29 +95,9 @@
       "description": "Fulfillment data: buyer expectations and what actually happened."
     },
     "payment": {
-      "type": "object",
-      "description": "How the order was paid. Reflects current state and may change post-purchase (e.g. order edits). Present when the business surfaces payment details on the order.",
-      "properties": {
-        "instruments": {
-          "type": "array",
-          "items": {
-            "allOf": [
-              { "$ref": "types/payment_instrument.json" },
-              {
-                "type": "object",
-                "required": ["display"],
-                "properties": {
-                  "amount": {
-                    "$ref": "../common/types/amount.json",
-                    "description": "The amount charged to this instrument, in the order currency's minor units (ISO 4217)."
-                  }
-                }
-              }
-            ]
-          },
-          "description": "The payment instruments used on the order."
-        }
-      }
+      "$ref": "#/$defs/order_payment",
+      "description": "Current payment details returned on the Order. May change after purchase when a separately authorized Order modification adds or replaces a tender.",
+      "ucp_request": "omit"
     },
     "adjustments": {
       "type": "array",
