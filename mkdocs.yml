@@ -96,6 +96,7 @@ nav:
                   - 3DS Challenge:
                       specification/payment/extensions/actions/three-ds-challenge.md
               - Payment Terms Extension: specification/payment/extensions/terms.md
+              - Payment Processing Extension: specification/payment/extensions/payment-processing.md
               - Split Payments Extension: specification/payment/extensions/split-payments.md
           - Payment Handlers:
               - Guide: specification/payment/guide.md
@@ -552,6 +553,10 @@ plugins:
               Payment Terms Extension, enabling checkout payment schedules for
               immediate and deferred payments such as deposits, installments,
               and lodging balance-at-check-in flows.
+          - specification/payment/extensions/payment-processing.md: >-
+              Payment Processing Extension, defining pre-completion capture
+              policy selection, Buyer approval records, and authorization and
+              capture reporting by provider attempt.
           - specification/payment/guide.md: >-
               Architectural framework and standard vocabulary for specifying UCP
               payment handlers, covering configuration declarations and

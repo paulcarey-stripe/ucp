@@ -1,0 +1,565 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ucp.dev/schemas/common/payment_processing.json",
+  "name": "dev.ucp.common.payment.processing",
+  "title": "Payment Processing Extension",
+  "description": "Selects a capture policy during Checkout and reports authorization and capture activity on Orders.",
+  "requires": {
+    "protocol": { "min": "2026-09-09" },
+    "capabilities": {
+      "dev.ucp.shopping.checkout": { "min": "2026-09-09" },
+      "dev.ucp.shopping.order": { "min": "2026-09-09" }
+    }
+  },
+  "$defs": {
+    "capture_mode_value": {
+      "type": "string",
+      "description": "When capture starts. Well-known values are `automatic` and `manual`. With `automatic`, the Business starts capture as part of completing Checkout, but the result may arrive later. Consumers MUST tolerate unknown values.",
+      "examples": ["automatic", "manual"]
+    },
+    "capture_sequence_value": {
+      "type": "string",
+      "description": "Intended capture sequence. Well-known values are `single` and `multiple`. Consumers MUST tolerate unknown values.",
+      "examples": ["single", "multiple"]
+    },
+    "capture_config": {
+      "type": "object",
+      "description": "Capture policies supported by a participant.",
+      "required": ["modes", "sequences"],
+      "properties": {
+        "modes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capture_mode_value" },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Supported capture initiation policies."
+        },
+        "sequences": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capture_sequence_value" },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Supported capture sequences."
+        },
+        "max_captures": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum successful captures supported for one processing attempt when known. Omission means no protocol-level limit is advertised."
+        }
+      }
+    },
+    "capture_policy": {
+      "type": "object",
+      "description": "Selected capture timing and sequence. Processing entries show what happened.",
+      "required": ["mode", "sequence"],
+      "properties": {
+        "mode": { "$ref": "#/$defs/capture_mode_value" },
+        "sequence": { "$ref": "#/$defs/capture_sequence_value" }
+      }
+    },
+    "business_config": {
+      "type": "object",
+      "description": "Payment processing policies supported by the Business.",
+      "required": ["capture"],
+      "properties": {
+        "capture": { "$ref": "#/$defs/capture_config" }
+      }
+    },
+    "platform_config": {
+      "type": "object",
+      "description": "Payment processing policies supported by the Platform.",
+      "properties": {
+        "capture": { "$ref": "#/$defs/capture_config" }
+      }
+    },
+    "checkout_processing": {
+      "type": "object",
+      "description": "Capture policy requested by the Platform or selected by the Business before Checkout completion.",
+      "required": ["capture"],
+      "properties": {
+        "capture": { "$ref": "#/$defs/capture_policy" }
+      }
+    },
+    "entry_type": {
+      "type": "string",
+      "description": "Kind of processing entry. Well-known values are `authorization`, `authorization_adjustment`, `capture`, `capture_reversal`, `authorization_release`, and `authorization_expiry`. Consumers MUST tolerate unknown values.",
+      "examples": ["authorization", "authorization_adjustment", "capture", "capture_reversal", "authorization_release", "authorization_expiry"]
+    },
+    "entry_status": {
+      "type": "string",
+      "description": "Outcome of a processing entry. Well-known values are `pending`, `succeeded`, and `failed`. Consumers MUST tolerate unknown values.",
+      "examples": ["pending", "succeeded", "failed"]
+    },
+    "processing_entry": {
+      "type": "object",
+      "description": "Entry in the provider processing history. Once reported, its content does not change.",
+      "required": ["id", "type", "status", "observed_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable entry identifier, unique within the Order."
+        },
+        "type": { "$ref": "#/$defs/entry_type" },
+        "status": { "$ref": "#/$defs/entry_status" },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ID of the payment approval whose maximum amount and capture policy applied when this authorization, authorization adjustment, or capture was requested."
+        },
+        "requested_amount": {
+          "$ref": "types/amount.json",
+          "description": "Amount requested from the provider in the Order currency's minor units. For an authorization adjustment, this is the requested new authorization total rather than a delta."
+        },
+        "amount": {
+          "$ref": "types/amount.json",
+          "description": "Amount reported for a successful authorization, adjustment, capture, or capture reversal, in the Order currency's minor units. For an authorization adjustment, this is the new authorization total rather than a delta."
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time the Business observed or initiated this entry."
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time reported by the provider when known. This may be omitted when the outcome or provider time is not yet known."
+        },
+        "authorization_entry_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Related root authorization entry in the same attempt."
+        },
+        "capture_entry_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Related successful capture entry in the same attempt."
+        },
+        "resolves_entry_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Previously reported pending entry in the same attempt resolved by this terminal entry. The referenced entry MUST have the same type."
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Provider-reported expiry for a successful authorization or adjustment."
+        },
+        "final": {
+          "type": "boolean",
+          "description": "For a capture, whether the Business intended it to be the last capture for the attempt. Settlement happens later."
+        },
+        "reference": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "Opaque provider reference that may be disclosed to the Buyer or Platform."
+        },
+        "failure_code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Machine-readable reason for a failed entry. Values are defined by the Business; consumers MUST tolerate unknown values."
+        },
+        "failure_message": {
+          "type": "string",
+          "description": "Human-readable explanation of a failed entry when the Business can safely disclose one."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "authorization" } }, "required": ["type"] },
+          "then": {
+            "required": ["approval_id"],
+            "not": {
+              "anyOf": [
+                { "required": ["authorization_entry_id"] },
+                { "required": ["capture_entry_id"] },
+                { "required": ["final"] }
+              ]
+            },
+            "allOf": [
+              {
+                "if": { "properties": { "status": { "const": "succeeded" } }, "required": ["status"] },
+                "then": { "required": ["amount"] }
+              },
+              {
+                "if": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+                "then": {
+                  "required": ["requested_amount"],
+                  "not": { "required": ["resolves_entry_id"] }
+                }
+              },
+              {
+                "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+                "then": { "required": ["requested_amount"] }
+              }
+            ]
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "authorization_adjustment" } }, "required": ["type"] },
+          "then": {
+            "required": ["approval_id", "authorization_entry_id"],
+            "not": {
+              "anyOf": [
+                { "required": ["capture_entry_id"] },
+                { "required": ["final"] }
+              ]
+            },
+            "allOf": [
+              {
+                "if": { "properties": { "status": { "const": "succeeded" } }, "required": ["status"] },
+                "then": { "required": ["amount"] }
+              },
+              {
+                "if": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+                "then": {
+                  "required": ["requested_amount"],
+                  "not": { "required": ["resolves_entry_id"] }
+                }
+              },
+              {
+                "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+                "then": { "required": ["requested_amount"] }
+              }
+            ]
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "capture" } }, "required": ["type"] },
+          "then": {
+            "required": ["approval_id"],
+            "not": {
+              "anyOf": [
+                { "required": ["capture_entry_id"] },
+                { "required": ["expires_at"] }
+              ]
+            },
+            "allOf": [
+              {
+                "if": { "properties": { "status": { "const": "succeeded" } }, "required": ["status"] },
+                "then": { "required": ["amount"] }
+              },
+              {
+                "if": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+                "then": {
+                  "required": ["requested_amount"],
+                  "not": { "required": ["resolves_entry_id"] }
+                }
+              },
+              {
+                "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+                "then": { "required": ["requested_amount"] }
+              }
+            ]
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "capture_reversal" } }, "required": ["type"] },
+          "then": {
+            "required": ["capture_entry_id"],
+            "not": {
+              "anyOf": [
+                { "required": ["approval_id"] },
+                { "required": ["authorization_entry_id"] },
+                { "required": ["expires_at"] },
+                { "required": ["final"] }
+              ]
+            },
+            "allOf": [
+              {
+                "if": { "properties": { "status": { "const": "succeeded" } }, "required": ["status"] },
+                "then": { "required": ["amount"] }
+              },
+              {
+                "if": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+                "then": {
+                  "required": ["requested_amount"],
+                  "not": { "required": ["resolves_entry_id"] }
+                }
+              },
+              {
+                "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+                "then": { "required": ["requested_amount"] }
+              }
+            ]
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "authorization_release" } }, "required": ["type"] },
+          "then": {
+            "required": ["authorization_entry_id"],
+            "not": {
+              "anyOf": [
+                { "required": ["approval_id"] },
+                { "required": ["capture_entry_id"] },
+                { "required": ["expires_at"] },
+                { "required": ["final"] },
+                { "required": ["requested_amount"] },
+                { "required": ["amount"] }
+              ]
+            },
+            "if": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+            "then": { "not": { "required": ["resolves_entry_id"] } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "authorization_expiry" } }, "required": ["type"] },
+          "then": {
+            "required": ["authorization_entry_id"],
+            "properties": { "status": { "const": "succeeded" } },
+            "not": {
+              "anyOf": [
+                { "required": ["approval_id"] },
+                { "required": ["requested_amount"] },
+                { "required": ["amount"] },
+                { "required": ["capture_entry_id"] },
+                { "required": ["resolves_entry_id"] },
+                { "required": ["expires_at"] },
+                { "required": ["final"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "enum": ["pending", "failed"] } },
+            "required": ["status"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["amount"] },
+                { "required": ["expires_at"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "failed" } },
+            "required": ["status"]
+          },
+          "then": { "required": ["failure_code"] },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["failure_code"] },
+                { "required": ["failure_message"] }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "attempt_status": {
+      "type": "string",
+      "description": "Current state of one provider processing attempt. Well-known values are `pending`, `authorized`, `partially_captured`, `captured`, `failed`, `released`, and `expired`. Consumers MUST tolerate unknown values.",
+      "examples": ["pending", "authorized", "partially_captured", "captured", "failed", "released", "expired"]
+    },
+    "processing_attempt": {
+      "type": "object",
+      "description": "One provider processing lifecycle for an existing Order instrument.",
+      "required": ["id", "instrument_id", "status", "entries", "entries_complete"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable attempt identifier, unique within the Order."
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ID of an existing order.payment.instruments member."
+        },
+        "reference": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "Opaque provider reference for this processing lifecycle when it can be safely disclosed."
+        },
+        "status": { "$ref": "#/$defs/attempt_status" },
+        "authorized_amount": {
+          "$ref": "types/amount.json",
+          "description": "Amount currently authorized in this attempt. Released and expired authorization is excluded. Remaining capture capacity is reported separately."
+        },
+        "captured_amount": {
+          "$ref": "types/amount.json",
+          "description": "Total amount successfully captured or collected in this attempt before refunds, credits, disputes, or capture reversals. This measures capture rather than settlement or payout."
+        },
+        "capturable_amount": {
+          "$ref": "types/amount.json",
+          "description": "Current amount the provider reports as available to capture when known. Consumers MUST NOT derive it by subtracting other fields."
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Current provider-reported expiry while authorization remains active."
+        },
+        "entries_complete": {
+          "type": "boolean",
+          "description": "Whether `entries` contains the full history for this attempt. `false` means older entries were omitted under the Business's retention policy."
+        },
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/processing_entry" },
+          "description": "Retained processing entries in the order the Business observed them.",
+          "contains": {
+            "allOf": [
+              {
+                "properties": { "type": { "const": "authorization" } },
+                "required": ["type"]
+              },
+              { "not": { "required": ["resolves_entry_id"] } }
+            ]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        }
+      }
+    },
+    "order_processing": {
+      "type": "object",
+      "description": "Buyer approvals and provider processing attempts reported for the Order.",
+      "required": ["approvals", "attempts"],
+      "properties": {
+        "approvals": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/payment_approval" },
+          "minItems": 1,
+          "description": "Buyer approvals in the order they were given.",
+          "prefixItems": [
+            {
+              "properties": { "type": { "const": "checkout" } },
+              "required": ["type"]
+            }
+          ],
+          "contains": {
+            "properties": { "type": { "const": "checkout" } },
+            "required": ["type"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        "attempts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/processing_attempt" },
+          "description": "Provider processing attempts for Order instruments. An attempt may contain entries associated with more than one approval."
+        }
+      }
+    },
+    "payment_approval": {
+      "type": "object",
+      "description": "Maximum total payment amount and capture policy approved by the Buyer at one point in the Order lifecycle.",
+      "required": ["id", "type", "maximum_amount", "capture"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable approval identifier, unique within the Order."
+        },
+        "type": {
+          "type": "string",
+          "description": "Buyer action that established this approval. Well-known values are `checkout` and `order_change`. Consumers MUST tolerate unknown values.",
+          "examples": ["checkout", "order_change"]
+        },
+        "maximum_amount": {
+          "$ref": "types/amount.json",
+          "description": "Maximum total amount the Buyer had approved for the Order at this point, in the Order currency's minor units. The Checkout approval equals `order.payment.maximum_amount`; a later approval states a new total rather than an increment."
+        },
+        "capture": { "$ref": "#/$defs/capture_policy" },
+        "adjustment_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ID of the `order.adjustments` entry recording the approved Order change. Required when `type` is `order_change`."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "checkout" } }, "required": ["type"] },
+          "then": { "not": { "required": ["adjustment_id"] } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "order_change" } }, "required": ["type"] },
+          "then": { "required": ["adjustment_id"] }
+        }
+      ]
+    },
+    "dev.ucp.common.payment.processing": {
+      "business_schema": {
+        "title": "Payment Processing Capability (Business)",
+        "description": "Business payment-processing capability configuration.",
+        "allOf": [
+          { "$ref": "../capability.json#/$defs/business_schema" },
+          {
+            "type": "object",
+            "required": ["config"],
+            "properties": {
+              "config": { "$ref": "#/$defs/business_config" }
+            }
+          }
+        ]
+      },
+      "platform_schema": {
+        "title": "Payment Processing Capability (Platform)",
+        "description": "Platform payment-processing capability configuration.",
+        "allOf": [
+          { "$ref": "../capability.json#/$defs/platform_schema" },
+          {
+            "type": "object",
+            "properties": {
+              "config": { "$ref": "#/$defs/platform_config" }
+            }
+          }
+        ]
+      }
+    },
+    "dev.ucp.shopping.checkout": {
+      "title": "Checkout with Payment Processing",
+      "description": "Checkout extended with a payment-processing policy selected before completion.",
+      "allOf": [
+        { "$ref": "../shopping/checkout.json" },
+        {
+          "type": "object",
+          "properties": {
+            "payment": {
+              "type": "object",
+              "ucp_response": "required",
+              "properties": {
+                "processing": {
+                  "$ref": "#/$defs/checkout_processing",
+                  "ucp_request": {
+                    "create": "optional",
+                    "update": "optional",
+                    "complete": "omit"
+                  },
+                  "ucp_response": "required"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "dev.ucp.shopping.order": {
+      "title": "Order with Payment Processing",
+      "description": "Order extended with the selected capture policy and payment processing reports.",
+      "allOf": [
+        { "$ref": "../shopping/order.json" },
+        {
+          "type": "object",
+          "properties": {
+            "payment": {
+              "type": "object",
+              "properties": {
+                "processing": {
+                  "$ref": "#/$defs/order_processing",
+                  "ucp_request": "omit",
+                  "ucp_response": "required"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -182,3 +182,4 @@ Honeycrisp
 unrepresentable
 wifi
 optionalities
+capturable
